@@ -3,13 +3,14 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-// One home in three segments, read off the sketch (north is the top of the page):
-//   west  : living room, dining corner and kitchen (entrance in the south wall)
-//   north-east : bedroom with a loft bed over a desk
-//   south-east : bathroom
+// One home in three segments, read off the sketch (top of the page = the TV wall):
+//   left of the page  : living room, dining corner and kitchen (entrance at the bottom)
+//   top right         : bedroom with a loft bed over a desk
+//   bottom right      : bathroom
 // The plan is scaled so the bed is 2.0 m long, which makes the home 8.4 m x 6.0 m.
 // Positions are written as fractions of the plan, U(across) and V(down the page).
-// Compass: +x is east, +z is south.
+// Compass: the wall with the TV, at the top of the page, faces east. So -z is east,
+// +x is south (the bathroom side), +z is west (the front door) and -x is north (the kitchen).
 const W = 8.4, D = 6.0, H = 2.7;
 const U = u => -W / 2 + u * W;          // plan fraction across -> world x
 const V = v => -D / 2 + v * D;          // plan fraction down  -> world z
@@ -548,8 +549,8 @@ export function buildScene(scene, renderer) {
   Object.assign(sun.shadow.camera, sunBox);
   scene.add(sun, sun.target);
 
-  // what the sunlit patches throw back: round the bedroom, and a little through its door
-  const bounces = [[2.3, 1.1, -0.15, 1.4], [0.2, 1.2, -0.7, 0.45]].map(([x, y, z, power]) => {
+  // what the sunlit patches throw back: in front of the living-room window and the bedroom's east window
+  const bounces = [[-0.4, 1.0, -1.3, 1.2], [2.35, 1.0, -1.9, 0.9]].map(([x, y, z, power]) => {
     const light = new THREE.PointLight(0xff9558, 0, 5, 2);
     light.position.set(x, y, z);
     scene.add(light);
@@ -561,7 +562,7 @@ export function buildScene(scene, renderer) {
     const pmrem = new THREE.PMREMGenerator(renderer), env = new THREE.Scene();
     env.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.ShaderMaterial({
       side: THREE.BackSide,
-      uniforms: { sd: { value: new THREE.Vector3(1, 0.10, 0.12).normalize() } },
+      uniforms: { sd: { value: new THREE.Vector3(0.12, 0.10, -1).normalize() } },
       vertexShader: 'varying vec3 d; void main(){ d = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
       fragmentShader: `varying vec3 d; uniform vec3 sd;
         void main(){ vec3 n = normalize(d);
@@ -603,10 +604,11 @@ export function buildScene(scene, renderer) {
     const m = add(new THREE.ShapeGeometry(s), wallMat, x, 0, z);
     m.rotation.y = rotY;
   }
-  const LIVING_WINDOW = [U(0.4), U(0.54)];          // north wall, between the two curtains
-  const BED_WINDOW = [-0.6, 0.4];                     // east wall, z range
+  const LIVING_WINDOW = [U(0.4), U(0.54)];          // TV wall (east), between the two curtains
+  const BED_WINDOW = [-0.6, 0.4];                     // bedroom's south wall, z range
+  const BED_EAST_WINDOW = [1.85, 2.85];               // a second bedroom window, on the east wall, for the morning sun
   const FRONT_DOOR = [U(0.48), U(0.61)];              // south wall, x range, beside the partition
-  wall(W, [[...LIVING_WINDOW, Y0, Y1]], 0, -D / 2, 0);                         // north (local x = world x)
+  wall(W, [[...LIVING_WINDOW, Y0, Y1], [...BED_EAST_WINDOW, Y0, Y1]], 0, -D / 2, 0);   // east (local x = world x)
   wall(D, [[...BED_WINDOW, Y0, Y1]], W / 2, 0, -Math.PI / 2);                  // east  (local x = world z)
   wall(W, [[-FRONT_DOOR[1], -FRONT_DOOR[0], 0, DOOR_H]], 0, D / 2, Math.PI);   // south (local x = -world x)
   wall(D, [], -W / 2, 0, Math.PI / 2);                                         // west
@@ -696,9 +698,9 @@ export function buildScene(scene, renderer) {
   ground.renderOrder = -1;
   outside.add(pano, ground);
 
-  // The town climbs away to the north: a neighbour across the lane, lower roofs
+  // The town climbs away to the south: a neighbour across the lane, lower roofs
   // stepping down towards the cliff edge, and the bell tower beyond. The valley
-  // opens to the east. Real geometry, so it shifts as you move and takes the
+  // opens to the east, below the TV-wall window. Real geometry, so it shifts as you move and takes the
   // sunrise on its east faces.
   {
     const seenThrough = m => Object.assign(m, throughWindows);
@@ -721,16 +723,16 @@ export function buildScene(scene, renderer) {
       roof.position.set(x, eave + pitch / 2, z);
       outside.add(body, roof);
     }
-    house(-1.2, -8.6, 7.6, 5.2, 2.9, 0xf3dccb);          // across the lane, filling the living-room window
-    house(6.4, -10.8, 5, 6, -0.6, 0xe9c9a0, 1.5);        // lower, towards the cliff: we look down on its roof
-    house(-8.2, -10.2, 5.5, 5, 0.9, 0xf2e2c4);
-    house(10.2, -15.2, 4.5, 4, -2.2, 0xe3b98e, 1.2);     // right on the cliff edge
-    house(-3.2, -16, 6, 6, 4.2, 0xead2b0);
-    house(3.4, -14.6, 2.6, 2.6, 8.2, 0xdcc9a8, 2.2);     // the bell tower
+    house(8.6, -1.2, 5.2, 7.6, 2.9, 0xf3dccb);           // across the lane, filling the bedroom's south window
+    house(10.8, 6.4, 6, 5, -0.6, 0xe9c9a0, 1.5);         // lower, towards the cliff: we look down on its roof
+    house(10.2, -8.2, 5, 5.5, 0.9, 0xf2e2c4);
+    house(15.2, 10.2, 4, 4.5, -2.2, 0xe3b98e, 1.2);     // right on the cliff edge
+    house(16, -3.2, 6, 6, 4.2, 0xead2b0);
+    house(14.6, 3.4, 2.6, 2.6, 8.2, 0xdcc9a8, 2.2);     // the bell tower
     const belfry = new THREE.Mesh(new THREE.BoxGeometry(2.7, 1.3, 2.7), seenThrough(new THREE.MeshStandardMaterial({ color: 0x3a3026, roughness: 1 })));
-    belfry.position.set(3.4, 7.0, -14.6);                // the dark openings where the bells hang
+    belfry.position.set(14.6, 7.0, 3.4);                 // the dark openings where the bells hang
     const cypress = new THREE.Mesh(new THREE.ConeGeometry(0.7, 6.5, 10), seenThrough(new THREE.MeshStandardMaterial({ color: 0x24382a, roughness: 1 })));
-    cypress.position.set(3.6, -1.6, -6.4);
+    cypress.position.set(6.4, -1.6, 3.6);
     outside.add(belfry, cypress);
   }
 
@@ -862,8 +864,9 @@ export function buildScene(scene, renderer) {
   const DEEP = 0.3;                                                     // old stone walls: windows sit back in them
   const lw = LIVING_WINDOW[1] - LIVING_WINDOW[0];
   windowUnit(lw, DEEP, (LIVING_WINDOW[0] + LIVING_WINDOW[1]) / 2, -D / 2, 0, sheerPink, 0.06, undefined, true);   // living room: shut, curtains tied back
+  windowUnit(BED_EAST_WINDOW[1] - BED_EAST_WINDOW[0], DEEP, (BED_EAST_WINDOW[0] + BED_EAST_WINDOW[1]) / 2, -D / 2, 0, sheerPink, 0.7, undefined, true);   // bedroom, east: shut, tied back
   const breezySheer = blown(new THREE.MeshStandardMaterial({ map: sheerPink.map, roughness: 0.85, side: THREE.DoubleSide }));
-  windowUnit(BED_WINDOW[1] - BED_WINDOW[0], DEEP, W / 2, (BED_WINDOW[0] + BED_WINDOW[1]) / 2, -Math.PI / 2, breezySheer, 0.72, [1.4, 1.3]);   // bedroom: open to the sunrise
+  windowUnit(BED_WINDOW[1] - BED_WINDOW[0], DEEP, W / 2, (BED_WINDOW[0] + BED_WINDOW[1]) / 2, -Math.PI / 2, breezySheer, 0.72, [1.4, 1.3]);   // bedroom, south: open, with the breeze
 
   // ---------- small shared pieces ----------
   const heartShape = k => {
@@ -913,7 +916,30 @@ export function buildScene(scene, renderer) {
     flat(w, h, new THREE.MeshStandardMaterial({ map, roughness: 0.6 }), 0, 0, 0.003, parent);
   }
   // a pastel lampshade (lamps are off: it is sunrise)
-  const shadeMat = (color, map) => new THREE.MeshStandardMaterial({ color, map, roughness: 0.9, side: THREE.DoubleSide });
+  const shadeMat = (color, map) => new THREE.MeshStandardMaterial({ color, map, emissiveMap: map, emissive: 0x000000, roughness: 0.9, side: THREE.DoubleSide });
+  const bulbMat = () => new THREE.MeshStandardMaterial({ color: 0xfff8e8, emissive: 0x000000, roughness: 0.3 });
+
+  // ---------- lamps you can click ----------
+  // Every lamp starts off. Each one's light exists from the start at zero brightness,
+  // so switching it on never makes the shaders rebuild; a click only sets numbers.
+  // An invisible cylinder around each lamp is what the click actually hits.
+  const lamps = [];
+  function lamp(x, y, z, { hit: [r, h], shades, bulb, power, distance = 5 }) {
+    const light = new THREE.PointLight(0xffb978, 0, distance, 2);
+    light.position.set(x, y, z);
+    scene.add(light);
+    const proxy = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 12), new THREE.MeshBasicMaterial({ visible: false }));
+    proxy.position.set(x, h / 2, z);
+    scene.add(proxy);
+    lamps.push({ light, proxy, shades, bulb, power, on: false });
+  }
+  function setLamp(l, on) {
+    l.on = on;
+    l.light.intensity = on ? l.power : 0;
+    for (const m of l.shades) { m.emissive.setRGB(1, 0.72, 0.45); m.emissiveIntensity = on ? 0.9 : 0; }
+    l.bulb.emissive.setRGB(1, 0.8, 0.55);
+    l.bulb.emissiveIntensity = on ? 8 : 0;
+  }
   function potPlant(x, y, z, potR, potH, potMat, leaves, leafLen, spread) {
     const g = group(x, y, z);
     add(turn([[0, 0], [potR * 0.78, 0], [potR, potH * 0.92], [potR * 1.04, potH], [potR * 0.92, potH]], 32), potMat, 0, 0, 0, g);
@@ -953,7 +979,65 @@ export function buildScene(scene, renderer) {
     return g;
   }
 
-  // ---------- living room: TV on a console against the north wall ----------
+  // The toy on the bed, from Natalie's photos: a yellow plush chick about 30 cm tall,
+  // its round head wider than its body, stubby wings, a red three-lobed comb, a pouty
+  // orange beak, brown eyes, pink swirl cheeks, big orange feet and a pink stitched x.
+  function chickToy(x, y, z, rotY) {
+    const g = group(x, y, z, rotY), plush = [];
+    const yellow = mat(0xf0e35a, null, { roughness: 1 }), orange = mat(0xf59a3a, null, { roughness: 0.9 });
+    const red = mat(0xd9302c, null, { roughness: 0.9 }), brown = mat(0x3a2216, null, { roughness: 0.35 }), stitch = paint(0xe57d9b);
+    const part = (r, m, px, py, pz, sx = 1, sy = 1, sz = 1, fur = true) => {
+      const p = add(new THREE.SphereGeometry(r, 22, 16), m, px, py, pz, g);
+      p.scale.set(sx, sy, sz);
+      if (fur) plush.push(p);
+      return p;
+    };
+    // feet, with three toes each
+    for (const s of [-1, 1]) {
+      part(1, orange, s * 0.045, 0.022, 0.03, 0.042, 0.024, 0.058);
+      for (const t of [-1, 0, 1]) part(0.016, orange, s * 0.045 + t * 0.022, 0.02, 0.083, 1, 0.9, 1);
+    }
+    part(1, yellow, 0, 0.105, 0, 0.085, 0.085, 0.075);                                   // body
+    for (const s of [-1, 1]) {                                                          // wings, sticking out and down
+      const w = part(1, yellow, s * 0.088, 0.125, 0.005, 0.045, 0.02, 0.035);
+      w.rotation.z = -s * 0.55;
+    }
+    const HX = 0.115, HY = 0.1, HZ = 0.092, hy = 0.255;
+    part(1, yellow, 0, hy, 0, HX, HY, HZ);                                               // head
+    for (const i of [-1, 0, 1]) {                                                       // comb
+      const c = part(0.024, red, i * 0.026, hy + HY - 0.004 + (i ? 0 : 0.012), -0.008, 0.9, 1.35, 0.8, false);
+      c.rotation.z = -i * 0.45;
+    }
+    // features sit on the surface of the head, just proud of the fur
+    const onHead = (px, py, lift) => {
+      const pz = HZ * Math.sqrt(Math.max(0, 1 - (px / HX) ** 2 - (py / HY) ** 2));
+      const n = new THREE.Vector3(px / (HX * HX), py / (HY * HY), pz / (HZ * HZ)).normalize();
+      return [new THREE.Vector3(px, hy + py, pz).addScaledVector(n, lift), n];
+    };
+    const z1 = new THREE.Vector3(0, 0, 1);
+    for (const s of [-1, 1]) {
+      const [at, n] = onHead(s * 0.042, 0.012, 0.008);
+      const eye = part(1, brown, at.x, at.y, at.z, 0.0115, 0.0155, 0.006, false);
+      eye.quaternion.setFromUnitVectors(z1, n);
+      part(0.0035, paint(0xffffff), at.x + s * 0.003, at.y + 0.006, at.z + 0.004, 1, 1, 1, false);
+      const [ca, cn] = onHead(s * 0.074, -0.03, 0.008);                                  // swirl cheeks: two rings
+      for (const r of [0.015, 0.008]) {
+        const ring = add(new THREE.TorusGeometry(r, 0.0022, 6, 28), stitch, ca.x, ca.y, ca.z, g);
+        ring.quaternion.setFromUnitVectors(z1, cn);
+      }
+    }
+    const [ba] = onHead(0, -0.014, 0.012);                                               // beak: a pouty upper and lower lip
+    part(1, orange, ba.x, ba.y, ba.z, 0.031, 0.015, 0.024, false);
+    part(1, orange, ba.x, ba.y - 0.017, ba.z - 0.004, 0.025, 0.011, 0.018, false);
+    for (const a of [0.8, -0.8]) {                                                      // the little x on the tummy
+      const st = box(0.018, 0.003, 0.003, stitch, 0, 0.075, 0.082, g);
+      st.rotation.z = a;
+    }
+    fluff(plush, { length: 0.0065, layers: 10, strand: 0.0017, droop: 0.05, shade: 0.75 });
+    return g;
+  }
+
+  // ---------- living room: TV on a console against the east wall ----------
   {
     const g = group(U(0.245), 0, -D / 2 + 0.22);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(0.02, 0.012, 0.14, gold, sx * 0.66, 0.07, sz * 0.14, g);
@@ -1020,8 +1104,10 @@ export function buildScene(scene, renderer) {
     const g = group(LIVING_WINDOW[1] + 0.5, 0, -D / 2 + 0.3);
     cyl(0.15, 0.17, 0.03, paint(P.white), 0, 0.015, 0, g);
     cyl(0.018, 0.018, 1.22, paint(P.white), 0, 0.63, 0, g);
-    add(turn([[0.24, 0], [0.235, 0.03], [0.2, 0.12], [0.13, 0.19], [0.05, 0.22], [0, 0.225]], 48), shadeMat(0xffffff, dotsTex('#f7b9c8', '#ffffff', 6, 2)), 0, 1.22, 0, g);
-    ball(0.05, paint(0xfff8e8), 0, 1.22, 0, g);
+    const shade = shadeMat(0xffffff, dotsTex('#f7b9c8', '#ffffff', 6, 2)), bulb = bulbMat();
+    add(turn([[0.24, 0], [0.235, 0.03], [0.2, 0.12], [0.13, 0.19], [0.05, 0.22], [0, 0.225]], 48), shade, 0, 1.22, 0, g);
+    ball(0.05, bulb, 0, 1.22, 0, g);
+    lamp(g.position.x, 1.15, g.position.z, { hit: [0.26, 1.48], shades: [shade], bulb, power: 1.6 });
   }
 
   // ---------- kitchen along the west wall: cooktop, sink, mint cupboards ----------
@@ -1169,7 +1255,7 @@ export function buildScene(scene, renderer) {
     const pillow = add(pillowGeo(0.62, 0.4, 0.15), mat(0xffffff, dotsTex('#ffffff', '#f7b9c8', 2)), mx, mattTop + 0.06, bz0 + 0.3);
     fluff([duvet], { length: 0.006, layers: 6, strand: 0.0018, shade: 0.85, uvSize: [bx1 - bx0 - 0.06, 1.42] });
     fluff([pillow], { length: 0.006, layers: 6, strand: 0.0018, shade: 0.85, uvSize: [0.62, 0.4] });
-    bunnyToy(mx - 0.12, mattTop + 0.09, bz0 + 0.62, Math.PI / 2 + 0.4, paint(0xfff8f0));
+    chickToy(mx - 0.08, mattTop + 0.07, bz0 + 0.66, -Math.PI / 2 + 0.35);
     // a floating shelf of books on the wall above the bed
     const shelfY = 2.22;
     soft(0.22, 0.03, 0.95, 0.008, paint(P.white), W / 2 - 0.11, shelfY, mz);
@@ -1200,13 +1286,18 @@ export function buildScene(scene, renderer) {
       p.rotation.set(lean, 0, -lean * 0.6);
     });
     // articulated lamp: base, two arms, a cone shade, all in pink
-    const lampMat = paint(0xf7a8bd), lamp = group(dcx + 0.12, surface, dz1 - 0.3);
-    cyl(0.06, 0.07, 0.02, lampMat, 0, 0.01, 0, lamp);
-    const arm1 = cyl(0.009, 0.009, 0.3, lampMat, -0.05, 0.16, 0, lamp); arm1.rotation.z = 0.35;
-    const arm2 = cyl(0.009, 0.009, 0.26, lampMat, -0.17, 0.33, 0, lamp); arm2.rotation.z = -1.0;
-    ball(0.016, gold, -0.1, 0.3, 0, lamp);
-    const head = add(turn([[0.07, 0], [0.065, 0.02], [0.03, 0.08], [0.016, 0.09]], 32), shadeMat(0xf7a8bd), -0.29, 0.36, 0, lamp);
+    const lampMat = paint(0xf7a8bd), deskLamp = group(dcx + 0.12, surface, dz1 - 0.3);
+    cyl(0.06, 0.07, 0.02, lampMat, 0, 0.01, 0, deskLamp);
+    const arm1 = cyl(0.009, 0.009, 0.3, lampMat, -0.05, 0.16, 0, deskLamp); arm1.rotation.z = 0.35;
+    const arm2 = cyl(0.009, 0.009, 0.26, lampMat, -0.17, 0.33, 0, deskLamp); arm2.rotation.z = -1.0;
+    ball(0.016, gold, -0.1, 0.3, 0, deskLamp);
+    const deskShade = shadeMat(0xf7a8bd), deskBulb = bulbMat();
+    const head = add(turn([[0.07, 0], [0.065, 0.02], [0.03, 0.08], [0.016, 0.09]], 32), deskShade, -0.29, 0.36, 0, deskLamp);
     head.rotation.z = 2.2;
+    ball(0.022, deskBulb, -0.27, 0.33, 0, deskLamp);
+    deskLamp.updateMatrixWorld(true);
+    const glowAt = deskLamp.localToWorld(new THREE.Vector3(-0.27, 0.3, 0));
+    lamp(glowAt.x, glowAt.y, glowAt.z, { hit: [0.2, surface + 0.5], shades: [deskShade], bulb: deskBulb, power: 0.5, distance: 2.5 });
     // its cable runs to a socket on the wall, as in the sketch
     const socketZ = dz1 + 0.12;
     flat(0.08, 0.08, paint(P.white), 0, 0, 0, group(W / 2 - 0.003, 0.35, socketZ, -Math.PI / 2));
@@ -1219,13 +1310,16 @@ export function buildScene(scene, renderer) {
 
   // ---------- the rest of the bedroom ----------
   {
-    // a standing lamp in the north-west corner, lilac and off
-    const g = group(U(0.707), 0, -D / 2 + 0.3);
+    // a standing lamp in the corner by the partition, lilac
+    const g = group(1.45, 0, -D / 2 + 0.35);
     cyl(0.13, 0.15, 0.025, paint(P.white), 0, 0.012, 0, g);
     cyl(0.015, 0.015, 1.4, gold, 0, 0.72, 0, g);
-    add(new THREE.CylinderGeometry(0.17, 0.22, 0.28, 48, 1, true), shadeMat(0xd9c8f0), 0, 1.5, 0, g);
+    const floorShade = shadeMat(0xd9c8f0), floorBulb = bulbMat();
+    add(new THREE.CylinderGeometry(0.17, 0.22, 0.28, 48, 1, true), floorShade, 0, 1.5, 0, g);
+    ball(0.04, floorBulb, 0, 1.44, 0, g);
+    lamp(1.45, 1.42, -D / 2 + 0.35, { hit: [0.24, 1.66], shades: [floorShade], bulb: floorBulb, power: 1.4 });
     // a plant in a spotty pot, by the bed
-    potPlant(U(0.84), 0, -D / 2 + 0.32, 0.19, 0.34, mat(0xffffff, dotsTex('#ffffff', '#f4a6ba', 4, 2)), 15, 0.6, 0.22);
+    potPlant(U(0.845), 0, -D / 2 + 0.34, 0.19, 0.34, mat(0xffffff, dotsTex('#ffffff', '#f4a6ba', 4, 2)), 15, 0.6, 0.22);
     // the print on the partition
     picture(printTex, 0.5, 0.65, 0.035, paint(P.pink), group(PX + T / 2 + 0.004, 1.55, V(0.23), Math.PI / 2));
     // a low dresser against the bathroom wall, a round mirror and a jewellery box on it
@@ -1315,12 +1409,32 @@ export function buildScene(scene, renderer) {
     const x0 = U(0.775), x1 = U(0.875) + 0.05, z0 = V(0.855), z1 = D / 2 - 0.02;
     slab(x1 - x0, 0.06, z1 - z0, 0.04, [porcelain, porcelain], (x0 + x1) / 2, 0, (z0 + z1) / 2);
     cyl(0.03, 0.03, 0.004, chrome, (x0 + x1) / 2, 0.062, (z0 + z1) / 2);
-    const screen = new THREE.MeshPhysicalMaterial({ color: 0xeaf6f6, roughness: 0.05, transparent: true, opacity: 0.22, side: THREE.DoubleSide });
-    const panel = add(new THREE.PlaneGeometry(x1 - x0 - 0.3, 1.9), screen, (x0 + x1) / 2 + 0.15, 1.01, z0);
-    panel.castShadow = false;
-    hideFromAO.push(panel);
-    soft(0.02, 1.9, 0.02, 0.006, gold, x0 + 0.3, 1.01, z0);
-    soft(0.02, 0.02, z1 - z0, 0.006, gold, x0 + 0.3, 1.96, (z0 + z1) / 2);
+    // a glass enclosure you can actually see: faintly aqua glass with a frosted band
+    // across it, every edge framed in gold, fixed panels on three sides and a hinged door
+    const glassTint = new THREE.MeshPhysicalMaterial({ color: 0xcdeeea, roughness: 0.08, transparent: true, opacity: 0.34, envMapIntensity: 2.5, side: THREE.DoubleSide, depthWrite: false });
+    const frost = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+    const gh = 1.95, gy = 0.06 + gh / 2;
+    const glassPanel = (w, cx, cz, rotY, parent) => {
+      const g = group(cx, gy, cz, rotY, parent);
+      for (const [geo, m, y] of [[new THREE.PlaneGeometry(w, gh), glassTint, 0], [new THREE.PlaneGeometry(w - 0.03, 0.3), frost, 0.08]]) {
+        const pane = add(geo, m, 0, y, 0, g);
+        pane.castShadow = false;
+        hideFromAO.push(pane);
+      }
+      for (const sgn of [-1, 1]) {
+        soft(0.022, gh, 0.022, 0.006, gold, sgn * w / 2, 0, 0, g);
+        soft(w, 0.022, 0.022, 0.006, gold, 0, sgn * gh / 2, 0, g);
+      }
+      return g;
+    };
+    const doorW = 0.5;
+    glassPanel(x1 - x0 - doorW, x0 + doorW + (x1 - x0 - doorW) / 2, z0, 0);            // facing the room, fixed
+    glassPanel(z1 - z0, x0, (z0 + z1) / 2, Math.PI / 2);                               // the tub side
+    glassPanel(z1 - z0, x1, (z0 + z1) / 2, Math.PI / 2);                               // the toilet side
+    // the door, hinged at the corner and left a little open into the bathroom
+    const hinge = group(x0, 0, z0, 0.45);
+    glassPanel(doorW, doorW / 2, 0, 0, hinge);
+    for (const sgn of [-1, 1]) soft(0.018, 0.32, 0.018, 0.006, gold, doorW - 0.07, gy, sgn * 0.035, hinge);   // handle, both sides
     cyl(0.012, 0.012, 2.0, chrome, (x0 + x1) / 2, 1.0, z1 - 0.04);
     cyl(0.12, 0.12, 0.02, chrome, (x0 + x1) / 2, 2.05, z1 - 0.18);
     cyl(0.01, 0.01, 0.15, chrome, (x0 + x1) / 2, 2.05, z1 - 0.1).rotation.x = Math.PI / 2;
@@ -1409,7 +1523,7 @@ export function buildScene(scene, renderer) {
   const landBase = new THREE.Color(0x7a8348);
   function setSun(minutes) {
     const el = 0.183 * minutes, az = 1.5 + 0.17 * minutes;                     // degrees up, degrees south of east
-    sunDir.set(Math.cos(az * DEG2RAD) * Math.cos(el * DEG2RAD), Math.sin(el * DEG2RAD), Math.sin(az * DEG2RAD) * Math.cos(el * DEG2RAD));   // +x east, +z south
+    sunDir.set(Math.sin(az * DEG2RAD) * Math.cos(el * DEG2RAD), Math.sin(el * DEG2RAD), -Math.cos(az * DEG2RAD) * Math.cos(el * DEG2RAD));   // -z east, +x south
     const risen = ramp(el, 0, 0.7);                                            // how much of the disc is over the ridge
     const day = ramp(el, 0, 6), dawn = ramp(el, -0.3, 8);
     const power = risen * lerp(3, 11, ramp(el, 0.3, 6));
@@ -1445,5 +1559,5 @@ export function buildScene(scene, renderer) {
   setSun(SUNRISE.start);
   renderSunDepth();
 
-  return { hideFromAO, volumetric, setSun, setWind, renderSunDepth };
+  return { hideFromAO, volumetric, setSun, setWind, renderSunDepth, lamps, setLamp };
 }

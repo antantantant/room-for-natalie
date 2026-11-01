@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pastel Apartment</title>
+<title>Room for Natalie</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #090b12; font-family: system-ui, sans-serif; color: #fbe3ec; }
   canvas { display: block; }
@@ -28,8 +28,8 @@
 </head>
 <body>
 <div id="label">
-  <h1>Pastel Apartment</h1>
-  <p>Drag to rotate · scroll to zoom · the bedroom window faces east</p>
+  <h1>Room for Natalie</h1>
+  <p>Drag to rotate · scroll to zoom · click a lamp to switch it on · the TV wall faces east</p>
   <button data-view="overview">Overview</button><button data-view="living">Living room</button><button data-view="bedroom">Bedroom</button><button data-view="plan">Floor plan</button>
 </div>
 <div id="transport" hidden>
@@ -44,9 +44,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // Bump ?v= whenever src/ changes: it stops a browser pairing this page with an older cached module.
-import { createPipeline } from './src/pipeline.js?v=1';
-import { buildScene, views, SUNRISE } from './src/scene.js?v=1';
-import { createMusic } from './src/audio.js?v=1';
+import { createPipeline } from './src/pipeline.js?v=2';
+import { buildScene, views, SUNRISE } from './src/scene.js?v=2';
+import { createMusic } from './src/audio.js?v=2';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 100);
@@ -61,6 +61,24 @@ controls.maxPolarAngle = Math.PI / 2 - 0.03;
 controls.minDistance = 0.5;
 controls.maxDistance = 14;
 controls.addEventListener('change', () => pipeline.invalidate());
+
+// Lamps: a click (not a drag) on a lamp switches it on or off.
+const canvas = pipeline.renderer.domElement, pointer = new THREE.Vector2(), ray = new THREE.Raycaster();
+function lampUnder(e) {
+  pointer.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(pointer, camera);
+  const hit = ray.intersectObjects(room.lamps.map(l => l.proxy))[0];
+  return hit && room.lamps.find(l => l.proxy === hit.object);
+}
+let pressedAt = null;
+canvas.addEventListener('pointerdown', e => { pressedAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!pressedAt || Math.hypot(e.clientX - pressedAt[0], e.clientY - pressedAt[1]) > 5) return;
+  const lamp = lampUnder(e);
+  if (lamp) { room.setLamp(lamp, !lamp.on); pipeline.invalidate(); }
+});
+canvas.addEventListener('pointermove', e => { if (!e.buttons) canvas.style.cursor = lampUnder(e) ? 'pointer' : ''; });
+window.__lamps = () => room.lamps.map(l => l.on);   // console helper: which lamps are on
 
 function setView(name, custom) {
   const [p, t] = custom || views[name];
