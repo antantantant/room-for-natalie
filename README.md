@@ -8,7 +8,7 @@ The home sits high in a hilltop town in Tuscany. The wall with the TV faces east
 
 The sketch draws the same floor plan twice, once with each half filled in. Combined, it is one home in three parts (the top of the page is the TV wall, which faces east):
 
-- **Living room, dining and kitchen (left of the page):** TV on a console, an L-shaped sofa facing it (chaise on its west end) on a flower rug, a window with tied-back curtains and a lamp, a kitchen run on the west wall with the fridge in the corner, a dining table for four, a closet built into the south wall, and the front door with a "Hi" mat.
+- **Living room, dining and kitchen (left of the page):** TV on a console, an L-shaped sofa facing it (chaise on its left) on a flower rug, a window with tied-back curtains and a lamp, a kitchen run on the north wall with the fridge in the corner, a dining table for four, a closet built into the west wall, and the front door with a "Hi" mat.
 - **Bedroom (top right):** a loft bed over a desk with Natalie's yellow plush chick on it, a floor lamp, a plant in a spotty pot, a print on the wall, a low dresser, and two windows.
 - **Bathroom (bottom right):** an oval tub, a fringed bath mat, a pedestal basin with a round mirror, a toilet, and a glass shower enclosure with a door.
 
